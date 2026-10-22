@@ -90,7 +90,13 @@ class Log:
         self.path = path
         self.echo = echo
         if path:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
+            # 目录建不出来（只读安装位置/权限不足）不应该让程序直接崩掉
+            try:
+                d = os.path.dirname(path)
+                if d:
+                    os.makedirs(d, exist_ok=True)
+            except Exception:
+                pass
 
     def __call__(self, msg, level="INFO"):
         line = "%s [%s] %s" % (time.strftime("%Y-%m-%d %H:%M:%S"), level, msg)
