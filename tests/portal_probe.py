@@ -55,6 +55,17 @@ def txt(b):
     return b.decode("utf-8", "replace")
 
 
+def local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
 def main():
     hosts = ["portal.gdou.edu.cn", "210.38.137.86", "www.gdou.edu.cn"]
     for h in hosts:
@@ -63,8 +74,9 @@ def main():
         except Exception as e:
             say("[DNS] %-22s -> fail %s" % (h, type(e).__name__))
 
+    ip = local_ip()
     paths = ["/", "/srun_portal_pc?ac_id=1", "/eportal/",
-             "/cgi-bin/get_challenge?callback=cb&username=%s&ip=10.141.216.70" % USER,
+             "/cgi-bin/get_challenge?callback=cb&username=%s&ip=%s" % (USER, ip),
              "/cgi-bin/srun_portal?action=logout"]
     for h in hosts:
         for scheme in ("http", "https"):

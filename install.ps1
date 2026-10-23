@@ -2,12 +2,14 @@
 # 用法：
 #   .\install.ps1              装到「当前用户启动项」，登录 Windows 后自动后台运行，不需要管理员
 #   .\install.ps1 -Task        注册为计划任务（需要管理员权限）
+#   .\install.ps1 -Task -Resilient  计划任务每 5 分钟自检一次（睡眠唤醒/进程被杀也能自愈）
 #   .\install.ps1 -Task -Highest  计划任务以最高权限运行（这样才能自动连 Wi-Fi）
 #   .\install.ps1 -Uninstall   卸载
 
 param(
     [switch]$Task,
     [switch]$Highest,
+    [switch]$Resilient,
     [switch]$Uninstall
 )
 
@@ -78,6 +80,18 @@ if ($Task) {
     $action  = New-ScheduledTaskAction -Execute $py -Argument ('"' + $Script + '" --daemon --no-echo')
     $trigger = New-ScheduledTaskTrigger -AtLogOn
     try { $trigger.Delay = 'PT20S' } catch { }
+
+    # 启动文件夹/登录触发器只在"登录"时跑一次，睡眠唤醒不会触发。
+    # 这里给计划任务挂一个"每 5 分钟重复"的触发器：
+    # 程序自己带单实例锁，重复触发会立刻退出，无副作用；
+    # 但能覆盖 睡眠唤醒 / 进程被杀 / 网络切换 这些场景。
+    if ($Resilient) {
+        $rep = (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
+                    -RepetitionInterval (New-TimeSpan -Minutes 5) `
+                    -RepetitionDuration (New-TimeSpan -Days 3650)).Repetition
+        $trigger.Repetition = $rep
+        Write-Host '已启用 Resilient：每 5 分钟自检一次，睡眠唤醒后也会自动连。'
+    }
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
                     -DontStopIfGoingOnBatteries -StartWhenAvailable `
                     -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5) `
